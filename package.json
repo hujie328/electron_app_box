@@ -1,0 +1,58 @@
+{
+  "name": "electron_app_box",
+  "version": "1.0.0",
+  "description": "",
+  "main": "src/index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build-e": "electron-builder",
+    "dev-e": "electron ."
+  },
+  "homepage": "",
+  "author": {
+    "name": "hujie",
+    "email": "hujie_0328@163.com"
+  },
+  "license": "ISC",
+  "dependencies": {
+    "electron-log": "^5.1.7",
+    "electron-store": "^8.2.0",
+    "electron-updater": "^6.2.1",
+    "koa": "^2.15.3",
+    "koa-static": "^5.0.0",
+    "koa2-cors": "^2.0.6",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "electron": "31.3.1",
+    "electron-builder": "24.13.3"
+  },
+  "build": {
+    "appId": "com.example.app",
+    "extraResources": [
+      {
+        "from": "./appStatic",
+        "to": "appStatic"
+      }
+    ],
+    "publish": {
+      "provider": "generic",
+      "url": "http://example.com"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis"
+        }
+      ],
+      "artifactName": "${productName}_Setup_${version}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowElevation": true,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    }
+  }
+}

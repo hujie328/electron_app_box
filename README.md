@@ -21,6 +21,10 @@
 | upload               | 更新检查                                          |
 | package.json/build   | electron 打包配置项                               |
 
+### 开发环境
+
+推荐 node 版本 14.19.0
+
 ### 注意事项
 
 1.开发环境包 electron 和 electron-builder 下载慢可以切换镜像源  

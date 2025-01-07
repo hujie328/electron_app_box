@@ -35,7 +35,9 @@ class appServe {
                 win.webContents.send('set-data', message.toString())
                 ws.send("pang")
             })
-            ws.send("pang")
+            ws.on("open",(message)=>{
+                ws.send("链接成功")
+            })
         })
         this.httpServe.on("upgrade", (req, socket, head) => {
             if (req.url.toString() === "/wskoa1") {

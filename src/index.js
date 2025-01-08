@@ -10,9 +10,12 @@ try {
 
     const createWindow = () => {
 
+        // https://www.electronjs.org/zh/docs/latest/api/browser-window
         const win = new BrowserWindow({
             width: 1920,
             height: 1080,
+
+            // https://www.electronjs.org/zh/docs/latest/api/structures/web-preferences
             webPreferences: {
                 contextIsolation: true,
                 preload: path.join(__dirname, '/ipcModule/preload.js')

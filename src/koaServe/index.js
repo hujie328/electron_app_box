@@ -19,6 +19,7 @@ class appServe {
     }
     openCors() {
         this.serve.use(cors())
+        return this
     }
     openStatic() {
         this.serve.use(koaStatic(path.join(app.getAppPath(), './appStatic'), {
@@ -35,7 +36,7 @@ class appServe {
                 win.webContents.send('set-data', message.toString())
                 ws.send("pang")
             })
-            ws.on("open",(message)=>{
+            ws.on("open", (message) => {
                 ws.send("链接成功")
             })
         })
@@ -55,6 +56,11 @@ class appServe {
     }
     setPort(port) {
         this.port = port
+        return this
+    }
+    close() {
+        this.httpServe.close();
+        return this
     }
     listen(callback) {
         this.httpServe.listen(this.port, () => {

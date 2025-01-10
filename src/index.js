@@ -2,7 +2,7 @@ try {
     const { app, BrowserWindow } = require('electron')
     const path = require('path')
     const { registerIpcMainHandle } = require('./ipcModule/ipcMainFns.js')
-    const { appServe } = require('./koaServe/index.js')
+    const { appServe,dgramServe } = require('./koaServe/index.js')
     const { checkUpdate } = require('./upload/index.js')
     const { customTrayMenu } = require('./customMenu/index.js')
     const { registerGlobalShortcut } = require('./customGlobal/index.js')
@@ -39,6 +39,8 @@ try {
             win.loadURL(myServe.serve_url + '/h5/index.html')
         })
 
+        const socket = new dgramServe()
+        socket.sendMessage('88888')
         // 注册主进程事件
         registerIpcMainHandle(win)
 

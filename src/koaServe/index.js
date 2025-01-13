@@ -118,7 +118,7 @@ class dgramServe {
             // 启用广播功能，允许发送广播消息
         })
         this.socket.on('error', () => {
-            socket.close()
+            this.socket.close()
         })
 
         this.socket.on('close', () => {

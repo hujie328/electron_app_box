@@ -37,6 +37,9 @@
         "to": "appStatic"
       }
     ],
+    "files": [
+      "!appStatic/**/*"
+    ],
     "publish": {
       "provider": "generic",
       "url": "http://example.com"

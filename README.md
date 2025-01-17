@@ -30,3 +30,24 @@
 1.开发环境包 electron 和 electron-builder 下载慢可以切换镜像源  
 2.打包时或者调试时需要下载编译文件和一些二进制字节码文件，下载地址是 github 仓库,并且不受 npm 的镜像源影响,会的话可以使用 TZ 搭建终端代理。  
 不然的话根据报错信息点击链接手动下载，然后复制到 C 盘指定文件即可。具体文件位置可根据报错信息自行搜索。
+
+简单示例：  
+electronDepend/electron-builder 解压至 -------> C:\Users\Administrator\AppData\Local\electron-builder  
+electronDepend/electron 解压至 -------> C:\Users\Administrator\AppData\Local\electron
+
+```js
+
+// 指定文件目录复制
+"extraResources": [
+    {
+        "from": "./appStatic",
+        "to": "appStatic"
+    }
+],
+// 排除打包某个文件或目录
+"files": [
+    "!appStatic/**/*",
+    "!electronDepend/**/*",
+],
+
+```

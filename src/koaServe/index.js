@@ -16,11 +16,11 @@ class staticServe {
     constructor(port) {
         if (port) this.port = port
         this.serve = new koa2()
-        this.serve.use(koaStatic(this.staticDir), {
+        this.serve.use(koaStatic(this.staticDir, {
             index: false,
             hidden: false,
             defer: true
-        })
+        }))
     }
     listen(callback) {
         this.serve.listen(this.port, () => {

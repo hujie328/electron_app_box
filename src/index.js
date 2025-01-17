@@ -23,7 +23,7 @@ try {
         })
 
         // win.fullScreen = true // 开启全屏
-        // win.webContents.openDevTools()
+        win.webContents.openDevTools()
         customTrayMenu(win)
 
         // 允许加载线上地址

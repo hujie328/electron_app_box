@@ -33,12 +33,12 @@
     "appId": "com.example.app",
     "extraResources": [
       {
-        "from": "./appStatic",
-        "to": "appStatic"
+        "from": "./testDir",
+        "to": "testDir"
       }
     ],
     "files": [
-      "!appStatic/**/*"
+      "!testDir/**/*"
     ],
     "publish": {
       "provider": "generic",

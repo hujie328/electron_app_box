@@ -11,7 +11,7 @@ const ws = require("ws")
 class staticServe {
     serve = null
     port = 9000
-    staticDir = path.join(app.getAppPath(), '../appStatic')
+    staticDir = path.join(app.getAppPath(), './appStatic')
     serve_url = ''
     constructor(port) {
         if (port) this.port = port
@@ -167,7 +167,7 @@ class appServe {
         return this
     }
     openStatic() {
-        this.serve.use(koaStatic(path.join(app.getAppPath(), '../appStatic'), {
+        this.serve.use(koaStatic(path.join(app.getAppPath(), './appStatic'), {
             index: false,
             hidden: false,
             defer: true

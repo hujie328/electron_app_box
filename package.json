@@ -1,12 +1,16 @@
 {
   "name": "electron_app_box",
   "version": "1.0.0",
-  "description": "",
+  "description": "Electron desktop application shell for wrapping web apps.",
   "main": "src/index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "build-e": "electron-builder",
-    "dev-e": "electron ."
+    "dev-e": "chcp 65001 >nul && nodemon --watch src --watch appStatic --ext js,json,html --exec electron .",
+    "dev-e:once": "chcp 65001 >nul && electron ."
+  },
+  "engines": {
+    "node": ">=20"
   },
   "homepage": "",
   "author": {
@@ -15,42 +19,35 @@
   },
   "license": "ISC",
   "dependencies": {
-    "dgram": "^1.0.1",
-    "electron-log": "^5.1.7",
-    "electron-store": "^8.2.0",
-    "electron-updater": "^6.2.1",
-    "koa": "^2.15.3",
+    "@koa/cors": "^5.0.0",
+    "electron-log": "^5.4.4",
+    "electron-store": "^11.0.2",
+    "electron-updater": "^6.8.3",
+    "koa": "^2.16.4",
     "koa-static": "^5.0.0",
-    "koa2-cors": "^2.0.6",
-    "os": "^0.1.2",
-    "ws": "^8.18.0"
+    "ws": "^8.21.0"
   },
   "devDependencies": {
-    "electron": "31.3.1",
-    "electron-builder": "24.13.3"
+    "electron": "41.7.1",
+    "electron-builder": "^26.0.12",
+    "nodemon": "^3.1.10"
   },
   "build": {
     "appId": "com.example.app",
-    "extraResources": [
-      {
-        "from": "./testDir",
-        "to": "testDir"
-      }
-    ],
-    "files": [
-      "!testDir/**/*"
-    ],
     "publish": {
       "provider": "generic",
       "url": "http://example.com"
     },
     "win": {
+      "icon": "icons/icon.ico",
       "target": [
         {
           "target": "nsis"
         }
       ],
-      "artifactName": "${productName}_Setup_${version}.${ext}"
+      "artifactName": "${productName}_Setup_${version}.${ext}",
+      "signAndEditExecutable": true,
+      "verifyUpdateCodeSignature": true
     },
     "nsis": {
       "oneClick": false,
@@ -58,6 +55,23 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true
+    },
+    "mac": {
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "category": "public.app-category.utilities",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "category": "Utility"
     }
   }
 }
+

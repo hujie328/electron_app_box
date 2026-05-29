@@ -1,130 +1,119 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh">
 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Document</title>
+    <title>Electron App Box WebSocket 示例</title>
 </head>
 
 <body>
     <h1>Electron-Box</h1>
+
     <script>
         /**
-  * WebSocketWrapper 类，用于封装 WebSocket 连接操作，并实现心跳检测和断线重连
-  */
-        class WebSocketWrapper {
+         * WebSocketClient 用于演示普通浏览器页面如何连接本地 WebSocket 服务。
+         *
+         * 注意：Electron 应用正式页面通常通过 preload 暴露的 window.AppFns 接收主进程转发消息；
+         * 这个根目录 index.html 更像独立调试页，不是 runtime 默认加载的入口。
+         */
+        class WebSocketClient {
             /**
-             * 构造函数
-             * @param {string} url - WebSocket 服务器的 URL
-             * @param {Object} options - 建立连接时的可选配置
+             * @param {string} url WebSocket 服务地址，例如 ws://127.0.0.1:50080/wskoa1
+             * @param {object} options 可选配置，用于覆盖重连间隔和心跳间隔
              */
             constructor(url, options = {}) {
-                this.url = url; // 存储服务器 URL
-                this.options = options; // 存储连接配置
-                this.ws = null; // WebSocket 实例
-                this.reconnectInterval = 5000; // 重连间隔时间（毫秒）
-                this.heartbeatInterval = 10000; // 心跳间隔时间（毫秒）
-                this.isReconnecting = false; // 标记是否正在重连
-                this.init(); // 初始化连接
+                this.url = url
+                this.options = options
+                this.socket = null
+                this.reconnectTimer = null
+                this.heartbeatTimer = null
+                this.reconnectInterval = options.reconnectInterval || 5000
+                this.heartbeatInterval = options.heartbeatInterval || 10000
+                this.isReconnecting = false
+
+                this.connect()
             }
 
-            /**
-             * 初始化连接方法
-             */
-            init() {
-                this.connect(); // 建立连接
-            }
-
-            /**
-             * 建立 WebSocket 连接的方法
-             */
+            /** 创建新的 WebSocket 连接，并绑定连接、消息、异常、关闭事件。 */
             connect() {
-                this.ws = new WebSocket(this.url); // 创建新的 WebSocket 连接
-                this.bindEvents(); // 绑定相关事件处理函数
+                this.socket = new WebSocket(this.url)
+                this.bindEvents()
             }
 
             /**
-             * 绑定 WebSocket 事件的方法
+             * 绑定 WebSocket 生命周期事件。
+             *
+             * 这里使用属性赋值而不是 addEventListener，是因为每次重连都会创建新的 socket 实例，
+             * 旧实例关闭后不会继续复用事件处理器。
              */
             bindEvents() {
-                // 连接成功时的处理函数
-                this.ws.onopen = () => {
-                    console.log('WebSocket 连接已打开');
-                    this.startHeartbeat(); // 启动心跳检测
-                };
+                this.socket.onopen = () => {
+                    console.log('WebSocket 连接已打开')
+                    this.startHeartbeat()
+                }
 
-                // 接收消息时的处理函数
-                this.ws.onmessage = (event) => {
-                    // 处理接收到的消息
-                    console.log(`接收到消息: ${event.data}`);
-                };
+                this.socket.onmessage = (event) => {
+                    console.log(`接收到消息: ${event.data}`)
+                }
 
-                // 连接出错时的处理函数
-                this.ws.onerror = (error) => {
-                    console.error('WebSocket 发生错误:', error);
-                    this.handleDisconnect(); // 处理断线
-                };
+                this.socket.onerror = (error) => {
+                    console.error('WebSocket 发生错误:', error)
+                    this.handleDisconnect()
+                }
 
-                // 连接关闭时的处理函数
-                this.ws.onclose = (event) => {
-                    console.log('WebSocket 连接已关闭:', event.code, event.reason);
-                    this.handleDisconnect(); // 处理断线
-                };
+                this.socket.onclose = (event) => {
+                    console.log('WebSocket 连接已关闭:', event.code, event.reason)
+                    this.handleDisconnect()
+                }
             }
 
-            /**
-             * 启动心跳检测的方法
-             */
+            /** 启动心跳，定时向服务端发送 heartbeat，避免长时间空闲连接被代理或系统回收。 */
             startHeartbeat() {
+                clearInterval(this.heartbeatTimer)
                 this.heartbeatTimer = setInterval(() => {
-                    if (this.ws.readyState === WebSocket.OPEN) {
-                        // 当连接处于打开状态时，发送心跳消息（这里可以是自定义的特定字符串）
-                        this.ws.send('heartbeat');
+                    if (this.socket.readyState === WebSocket.OPEN) {
+                        this.socket.send('heartbeat')
                     }
-                }, this.heartbeatInterval);
+                }, this.heartbeatInterval)
             }
 
-            /**
-             * 处理断线的方法
-             */
+            /** 处理断线重连；isReconnecting 防止 error 和 close 同时触发时创建多个重连定时器。 */
             handleDisconnect() {
-                if (!this.isReconnecting) {
-                    this.isReconnecting = true; // 设置重连标记
-                    // 延迟一段时间后尝试重连
-                    setTimeout(() => {
-                        this.connect(); // 重新建立连接
-                        this.isReconnecting = false; // 清除重连标记
-                    }, this.reconnectInterval);
-                }
+                clearInterval(this.heartbeatTimer)
+
+                if (this.isReconnecting) return
+
+                this.isReconnecting = true
+                this.reconnectTimer = setTimeout(() => {
+                    this.connect()
+                    this.isReconnecting = false
+                }, this.reconnectInterval)
             }
 
-            /**
-             * 发送数据的方法
-             * @param {*} data - 要发送的数据
-             */
+            /** 发送业务消息；连接未打开时直接提示，避免浏览器抛出 InvalidStateError。 */
             send(data) {
-                if (this.ws.readyState === WebSocket.OPEN) {
-                    this.ws.send(data); // 发送数据
-                } else {
-                    console.error('WebSocket 连接未打开，无法发送数据');
+                if (this.socket.readyState === WebSocket.OPEN) {
+                    this.socket.send(data)
+                    return
                 }
+
+                console.error('WebSocket 连接未打开，无法发送数据')
             }
 
-            /**
-             * 关闭 WebSocket 连接的方法
-             */
+            /** 主动关闭连接并清理定时器。 */
             close() {
-                clearInterval(this.heartbeatTimer); // 清除心跳检测定时器
-                this.ws.close(); // 关闭连接
+                clearTimeout(this.reconnectTimer)
+                clearInterval(this.heartbeatTimer)
+                this.socket?.close()
             }
         }
 
-        // 使用示例
-        const wrapper = new WebSocketWrapper('http://172.30.1.160:50080/wskoa1');
+        // 独立调试示例：先启动 Electron 应用，再用浏览器打开这个页面进行 WS 连接测试。
+        const demoSocket = new WebSocketClient('ws://127.0.0.1:50080/wskoa1')
 
-        // 关闭连接
-        // wrapper.close();
+        // 如需手动关闭连接，可在控制台执行 demoSocket.close()。
+        window.demoSocket = demoSocket
     </script>
 </body>
 

@@ -1,45 +1,67 @@
-const { app, dialog } = require('electron')
+const { dialog } = require('electron')
+const { autoUpdater } = require('electron-updater')
 const { logger } = require('../log/index.js')
 
+/**
+ * 注册自动更新事件。
+ *
+ * autoUpdater 是单例，多次调用 checkForUpdates 时如果不先清理旧监听，
+ * 同一个事件会触发多次，例如下载完成后弹出多个确认框。
+ */
+function registerUpdaterEvents() {
+    autoUpdater.removeAllListeners('error')
+    autoUpdater.removeAllListeners('update-available')
+    autoUpdater.removeAllListeners('checking-for-update')
+    autoUpdater.removeAllListeners('update-downloaded')
 
-const { autoUpdater } = require('electron-updater')
-const checkUpdate = () => {
-    autoUpdater.setFeedURL('http://example.com')  //设置要检测更新的路径	
-
-    //监听'error'事件
     autoUpdater.on('error', (err) => {
-        logger.error(`监听更新失败：${err}`)
+        logger.error(`update listener failed: ${err}`)
     })
 
-    //监听'update-available'事件，发现有新版本时触发
     autoUpdater.on('update-available', () => {
-        logger.info('发现新版本 found new version')
+        logger.info('update available')
     })
 
     autoUpdater.on('checking-for-update', () => {
         logger.info('checking new version')
     })
-    //默认会自动下载新版本，如果不想自动下载，设置autoUpdater.autoDownload = false
 
-    //监听'update-downloaded'事件，新版本下载完成时触发
     autoUpdater.on('update-downloaded', () => {
+        // 新版本下载完后再询问用户是否立即安装，避免用户正在操作时被强制退出。
         dialog.showMessageBox({
             type: 'info',
             title: '应用更新',
             message: '发现新版本，是否更新？更新后请重新登录！',
             buttons: ['是', '否']
         }).then((buttonIndex) => {
-            if (buttonIndex.response == 0) {  //选择是，则退出程序，安装新版本
-                isPreventClose = false
+            if (buttonIndex.response === 0) {
                 autoUpdater.quitAndInstall()
-                app.quit()
             }
         })
     })
-    //检测更新
-    autoUpdater.checkForUpdates()
+}
+
+/**
+ * 检查应用更新。
+ *
+ * feedUrl 需要指向 electron-builder generic provider 的发布目录，目录中必须包含 latest.yml
+ * 以及对应安装包文件。开发阶段默认关闭更新，避免访问占位地址。
+ */
+const checkForUpdates = (feedUrl) => {
+    if (!feedUrl) {
+        logger.error('update feed url is empty')
+        return Promise.resolve(null)
+    }
+
+    autoUpdater.setFeedURL(feedUrl)
+    registerUpdaterEvents()
+
+    return autoUpdater.checkForUpdates().catch((err) => {
+        logger.error(`check update failed: ${err}`)
+        return null
+    })
 }
 
 module.exports = {
-    checkUpdate
+    checkForUpdates,
 }

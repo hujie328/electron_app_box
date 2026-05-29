@@ -4,6 +4,8 @@ const { checkForUpdates } = require('../upload/index.js')
 const { createTrayMenu, destroyTray } = require('../customMenu/index.js')
 const { registerGlobalShortcut, unregisterGlobalShortcut } = require('../customGlobal/index.js')
 const { AppSecurityGuard } = require('../security/index.js')
+const { DownloadManager } = require('../download/index.js')
+const { getAssetPath } = require('../utils/assetPath.js')
 const { logger } = require('../log/index.js')
 
 /**
@@ -31,6 +33,7 @@ class AppRuntime {
             staticServer: null,
             apiServer: null,
             udpServer: null,
+            downloadManager: null,
         }
     }
 
@@ -40,6 +43,7 @@ class AppRuntime {
 
         this._startTray()
         this._startSecurityGuard()
+        this._startDownloadManager()
         this._startIpc()
         this._startShortcuts()
         this._startLocalServices()
@@ -59,9 +63,20 @@ class AppRuntime {
         this.securityGuard.attach(this.mainWindow)
     }
 
+    /** 下载管理器接管 Electron will-download，向页面推送下载进度。 */
+    _startDownloadManager() {
+        if (!this.config.features.downloads) return
+
+        this.services.downloadManager = new DownloadManager(this.mainWindow)
+        this.services.downloadManager.start()
+    }
+
     /** 注册主进程 IPC 通道，让渲染进程可以通过 preload 暴露的 API 与主进程通信。 */
     _startIpc() {
-        registerIpcMainHandle(this.mainWindow)
+        registerIpcMainHandle(this.mainWindow, {
+            config: this.config,
+            services: this.services,
+        })
     }
 
     /** 注册系统级快捷键；窗口关闭或应用退出时必须注销，否则可能影响其它应用。 */
@@ -115,13 +130,29 @@ class AppRuntime {
         }
 
         if (this.mainWindow && !this.mainWindow.isDestroyed()) {
-            this.mainWindow.loadURL(remoteUrl)
+            // loadURL 返回 Promise；DNS、证书、网络等错误会走 catch。
+            this.mainWindow.loadURL(remoteUrl).catch((err) => {
+                logger.error(`load remote page failed: ${err.message}`)
+                this._loadFallbackPage()
+            })
+
+            // did-fail-load 能覆盖更多 Chromium 导航失败场景，例如主资源加载中断。
+            this.mainWindow.webContents.once('did-fail-load', (_event, errorCode, errorDescription, validatedURL) => {
+                logger.error(`remote page did-fail-load: ${errorCode}, ${errorDescription}, ${validatedURL}`)
+                this._loadFallbackPage()
+            })
+        }
+    }
+
+    /** 加载本地兜底页，避免 remoteUrl 不可达时窗口白屏。 */
+    _loadFallbackPage() {
+        if (this.mainWindow && !this.mainWindow.isDestroyed()) {
+            this.mainWindow.loadFile(getAssetPath('appStatic', 'fallback', 'index.html'))
         }
     }
 
     /** 启动本地 API 服务和 WebSocket 服务。 */
     _startApiServer(server) {
-
         // API 服务当前主要承载 WebSocket，后续 Koa 路由也可以统一挂在这里。
         this.services.apiServer = new LocalHttpServer({
             host: server.host,
@@ -133,6 +164,14 @@ class AppRuntime {
         if (server.enableCors) {
             this.services.apiServer.openCors()
         }
+
+        // health 用于外部进程或页面确认本地壳服务是否已经启动。
+        this.services.apiServer.get('/health', () => ({
+            code: 0,
+            name: 'electron_app_box',
+            mode: this.config.window.loadMode,
+            timestamp: Date.now(),
+        }))
 
         // WS 收到的消息转发给渲染进程。网络服务本身不关心 UI，业务桥接集中在 runtime。
         this.services.apiServer.openWebSocket({
@@ -154,7 +193,7 @@ class AppRuntime {
 
     /** 触发自动更新检查；真正的更新事件处理在 upload 模块内部维护。 */
     _startUpdater() {
-        checkForUpdates(this.config.updater.feedUrl)
+        checkForUpdates(this.config.updater.feedUrl, this.mainWindow)
     }
 
     /**
@@ -167,11 +206,12 @@ class AppRuntime {
         unregisterGlobalShortcut()
         destroyTray()
 
+        this.services.downloadManager?.stop()
         this.services.udpServer?.close()
         this.services.apiServer?.close()
         this.services.staticServer?.close()
 
-        this.services = { staticServer: null, apiServer: null, udpServer: null }
+        this.services = { staticServer: null, apiServer: null, udpServer: null, downloadManager: null }
         this.mainWindow = null
         logger.info('AppRuntime stopped')
     }

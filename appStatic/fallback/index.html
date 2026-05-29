@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="zh">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- 兜底页只依赖本地静态资源，CSP 保持收紧，避免加载失败页再引入外部风险。 -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self';">
+    <title>页面加载失败</title>
+    <link rel="stylesheet" href="./style.css">
+</head>
+
+<body>
+    <main class="fallback">
+        <p class="eyebrow">Electron App Box</p>
+        <h1>线上页面暂时无法访问</h1>
+        <p class="desc">请检查网络连接、线上地址配置或安全白名单，然后重新加载页面。</p>
+        <button id="reloadBtn" type="button">重新加载</button>
+    </main>
+
+    <!-- 兜底页 JS 只负责调用 preload 暴露的 reloadApp，不包含业务逻辑。 -->
+    <script src="./app.js"></script>
+</body>
+
+</html>

@@ -12,21 +12,21 @@ const rawConfig = {
         // 页面加载模式:
         //   local  - 启动本地 StaticFileServer，并加载 appStatic 里的内置页面。
         //   remote - 不启动静态资源服务，直接加载 remoteUrl 指向的线上地址。
-        loadMode: 'local',
+        loadMode: 'remote',
 
         // loadMode 为 remote 时生效，必须填写完整 http/https 地址。
         // 注意：如果线上页面来自不可信域名，不建议暴露过多 preload API。
-        remoteUrl: 'https://example.com',
+        remoteUrl: 'https://fmcs.deerservice.com/its_camera/video-monitor',
 
         // true 表示启动后自动打开开发者工具；false 表示不自动打开。
         openDevTools: true
     },
     security: {
         // 是否拦截主窗口跳转到未知地址。通用外壳建议保持开启，尤其是 loadMode 为 remote 时。
-        enableNavigationGuard: true,
+        enableNavigationGuard: false,
 
         // 是否允许外部浏览器打开白名单内的外链。关闭后 window.open / target=_blank 都会被拦截。
-        allowOpenExternal: true,
+        allowOpenExternal: false,
 
         // 允许主窗口直接加载或跳转的源。local 模式下会自动允许本地静态服务地址。
         // remote 模式下建议只填写你自己可控的线上域名，例如 ['https://example.com']。
@@ -37,7 +37,27 @@ const rawConfig = {
         // 允许通过系统默认浏览器打开的外链源。为空表示不允许任何外链。
         externalAllowedOrigins: [
             'https://example.com'
-        ]
+        ],
+
+        // 权限请求策略。remote 页面建议默认 deny，再按可信域名和权限逐项放开。
+        permissions: {
+            defaultAction: 'deny',
+            allowedOrigins: [],
+            allowedPermissions: []
+        }
+    },
+    protocol: {
+        // 自定义协议用于浏览器/网页唤起客户端，例如 electron-app-box://open?id=1。
+        enabled: true,
+        scheme: 'electron-app-box'
+    },
+    features: {
+        // 控制 preload 暴露能力的开关。后续如果给不可信远程页面使用，可按需关闭。
+        fileSystem: true,
+        downloads: true,
+        session: true,
+        diagnostics: true,
+        updater: true
     },
     server: {
         // 默认监听 127.0.0.1，只允许本机访问；如需局域网访问可改为 0.0.0.0。

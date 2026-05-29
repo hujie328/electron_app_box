@@ -1,4 +1,4 @@
-const { app } = require('electron')
+const { app, shell } = require('electron')
 const path = require('node:path')
 const logger = require('electron-log')
 
@@ -18,4 +18,19 @@ logger.transports.file.resolvePathFn = () => resolvedLogPath
 // 日志格式包含级别、时间、scope 和正文，便于排查打包后用户机器上的问题。
 logger.transports.file.format = '[{level}][{y}-{m}-{d} {h}:{i}:{s}.{ms}]{scope} ----> "{text}"'
 
-module.exports = { logger }
+/** 返回当前日志文件完整路径，供诊断 IPC 或页面展示使用。 */
+function getLogPath() {
+    return resolvedLogPath
+}
+
+/** 返回日志所在目录；打开目录比直接打开文件更适合让用户导出或压缩日志。 */
+function getLogDir() {
+    return path.dirname(resolvedLogPath)
+}
+
+/** 调用系统文件管理器打开日志目录；shell.openPath 成功时返回空字符串。 */
+function openLogDir() {
+    return shell.openPath(getLogDir())
+}
+
+module.exports = { logger, getLogPath, getLogDir, openLogDir }

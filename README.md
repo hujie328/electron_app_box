@@ -27,6 +27,8 @@
 | `src/ipcModule/ipcPreload.js` | 预加载脚本，通过 `contextBridge` 向页面注入安全 API |
 | `src/koaServe/index.js` | 本地静态服务、HTTP 服务、WebSocket 服务、UDP 广播服务 |
 | `src/security/index.js` | 窗口导航守卫和外链白名单模块 |
+| `src/download/index.js` | 下载管理模块，接管下载进度和完成事件 |
+| `src/protocol/index.js` | 自定义协议注册与协议唤起处理 |
 | `src/config/app.config.js` | 可直接修改的原始运行配置 |
 | `src/config/index.js` | 配置标准化入口，负责默认值兜底、类型转换、路径补全 |
 | `src/customGlobal/index.js` | 全局快捷键注册与注销 |
@@ -54,6 +56,7 @@ runtime.start(win)
 
 - 托盘菜单：`createTrayMenu`
 - 导航安全守卫：`AppSecurityGuard`
+- 下载管理器：`DownloadManager`
 - 主进程 IPC：`registerIpcMainHandle`
 - 全局快捷键：`registerGlobalShortcut`
 - 静态资源服务：`StaticFileServer`
@@ -109,6 +112,10 @@ runtime?.stop()
 | -------- | ---- |
 | `app.js` | 应用级能力，例如关闭窗口、示例 invoke |
 | `file.js` | 文件系统能力，例如选择文件、选择目录、保存文本、显示文件位置 |
+| `diagnostics.js` | 应用信息、日志目录、日志导出、userData 目录 |
+| `session.js` | 缓存、Storage 清理和页面无缓存重载 |
+| `download.js` | 下载任务启动 |
+| `updater.js` | 手动检查更新 |
 | `index.js` | 汇总所有 IPC 路由，供 `ipcMain.js` 统一注册 |
 
 路由文件中通过统一上下文注册通道：
@@ -137,6 +144,14 @@ window.AppFns.selectFile(options)
 window.AppFns.selectDirectory(options)
 window.AppFns.saveTextFile(options)
 window.AppFns.showItemInFolder(targetPath)
+window.AppFns.getAppInfo()
+window.AppFns.openLogDir()
+window.AppFns.exportLog(options)
+window.AppFns.clearCache()
+window.AppFns.clearStorageData(options)
+window.AppFns.reloadApp()
+window.AppFns.startDownload(url, options)
+window.AppFns.checkForUpdates()
 ```
 
 订阅类 API 会返回取消订阅函数，组件化页面中必须在卸载时调用：
@@ -172,6 +187,70 @@ const saveResult = await window.AppFns.saveTextFile({
 await window.AppFns.showItemInFolder(saveResult.filePath)
 ```
 
+### 应用信息、日志和缓存
+
+诊断能力适合做“关于应用”“导出日志”“客户现场排查”：
+
+```js
+const appInfo = await window.AppFns.getAppInfo()
+await window.AppFns.openLogDir()
+await window.AppFns.exportLog()
+```
+
+缓存/会话能力适合远程页面更新后清理旧资源：
+
+```js
+await window.AppFns.clearCache()
+await window.AppFns.clearStorageData()
+await window.AppFns.reloadApp()
+```
+
+这些能力受 `features.diagnostics` 和 `features.session` 控制。
+
+### 下载管理
+
+下载由主进程接管，页面通过 IPC 启动下载，并通过订阅事件获取状态：
+
+```js
+const offProgress = window.AppFns.onDownloadProgress((data) => {
+    console.log(data.receivedBytes, data.totalBytes)
+})
+
+window.AppFns.onDownloadDone((data) => {
+    console.log('download done', data.savePath)
+    offProgress()
+})
+
+await window.AppFns.startDownload('https://example.com/file.zip')
+```
+
+默认保存到系统下载目录，也可以传入 `filename` 或 `savePath`。
+
+### 自定义协议
+
+协议模块支持从浏览器唤起客户端：
+
+```text
+electron-app-box://open?id=1
+```
+
+页面监听：
+
+```js
+window.AppFns.onProtocolOpen(({ url }) => {
+    console.log(url)
+})
+```
+
+配置位于 `src/config/app.config.js`：
+
+```js
+protocol: {
+    enabled: true,
+    scheme: 'electron-app-box'
+}
+```
+
 ### 安全模块
 
 `src/security/index.js` 提供 `AppSecurityGuard`，用于保护主窗口导航和外链打开：
@@ -188,7 +267,12 @@ security: {
     enableNavigationGuard: true,
     allowOpenExternal: true,
     allowedOrigins: ['https://example.com'],
-    externalAllowedOrigins: ['https://example.com']
+    externalAllowedOrigins: ['https://example.com'],
+    permissions: {
+        defaultAction: 'deny',
+        allowedOrigins: [],
+        allowedPermissions: []
+    }
 }
 ```
 
@@ -196,6 +280,7 @@ security: {
 
 - `allowedOrigins`：主窗口允许加载或跳转的线上源。
 - `externalAllowedOrigins`：允许通过系统默认浏览器打开的外链源。
+- `permissions`：控制摄像头、麦克风、通知、地理位置等权限请求。
 - `loadMode: 'remote'` 时，必须把 `remoteUrl` 所属 origin 加入 `allowedOrigins`。
 - 不建议把不可信域名加入白名单，因为线上页面可以访问 preload 暴露的 `window.AppFns`。
 
@@ -208,6 +293,9 @@ security: {
 - 对数字配置做正数兜底；
 - 对布尔配置兼容 `true` / `false`、`'true'` / `'false'`、`1` / `0`；
 - 自动补全窗口图标、静态资源根目录等路径。
+- 支持 `APP_ENV` / `NODE_ENV` 加载 `app.config.{env}.js`。
+- 支持 `app.config.local.js` 做本机覆盖配置。
+- 支持启动参数临时覆盖配置，例如 `--remote-url=https://xxx`。
 
 | 配置路径 | 作用 | 默认值 |
 | -------- | ---- | ------ |
@@ -220,6 +308,13 @@ security: {
 | `security.allowOpenExternal` | 是否允许白名单外链用系统浏览器打开 | `true` |
 | `security.allowedOrigins` | 主窗口允许加载或跳转的线上源 | `['https://example.com']` |
 | `security.externalAllowedOrigins` | 允许打开到系统浏览器的外链源 | `['https://example.com']` |
+| `protocol.enabled` | 是否注册自定义协议 | `true` |
+| `protocol.scheme` | 自定义协议名称 | `electron-app-box` |
+| `features.fileSystem` | 是否暴露文件系统能力 | `true` |
+| `features.downloads` | 是否暴露下载能力 | `true` |
+| `features.session` | 是否暴露缓存/会话能力 | `true` |
+| `features.diagnostics` | 是否暴露诊断和日志能力 | `true` |
+| `features.updater` | 是否暴露更新检查能力 | `true` |
 | `server.host` | 本地服务监听地址 | `127.0.0.1` |
 | `server.staticPort` | 静态资源服务端口 | `9000` |
 | `server.apiPort` | API / WebSocket 服务端口 | `50080` |
@@ -232,9 +327,15 @@ security: {
 | `updater.enabled` | 是否启用自动更新检查 | `false` |
 | `updater.feedUrl` | 自动更新发布地址 | `http://example.com` |
 
+启动参数示例：
+
+```bash
+npm run dev-e:once -- --load-mode=remote --remote-url=https://example.com --api-port=50081 --disable-udp
+```
+
 ## 开发环境
 
-推荐 Node.js 版本 20 以上。当前 `electron-builder` 已固定到支持 Node.js 20 的版本，避免安装时出现 Node 22 才支持的 `EBADENGINE` 警告。
+推荐 Node.js 版本 20 以上。当前 `electron-builder` 固定到支持 Node.js 20 且 NSIS 构建更稳定的 24.x 版本，避免安装时出现 Node 22 才支持的 `EBADENGINE` 警告。
 
 当前项目以 CommonJS 为主，`electron-store` 9+ 是 ESM 包，所以 `src/store/index.js` 中通过动态 `import()` 加载。
 
@@ -244,13 +345,19 @@ security: {
 npm run dev-e
 npm run dev-e:once
 npm run build-e
+npm run build-e:nsis
+npm run build-e:portable
+npm run build-e:unsigned
 ```
 
 命令说明：
 
 - `npm run dev-e`：使用 `nodemon` 监听 `src` 和 `appStatic`，代码变更后自动重启 Electron。
 - `npm run dev-e:once`：只启动一次 Electron，不启用热重载。
-- `npm run build-e`：使用 `electron-builder` 打包。
+- `npm run build-e`：默认等同于 `npm run build-e:nsis`。
+- `npm run build-e:nsis`：只产出 Windows NSIS 安装包。
+- `npm run build-e:portable`：只产出 Windows portable 可执行文件。
+- `npm run build-e:unsigned`：Windows 本地调试用的未签名打包命令，会关闭证书自动发现和 Windows 可执行文件签名编辑。
 
 首次使用热重载前需要安装依赖：
 
@@ -321,6 +428,7 @@ const rawConfig = {
 - `loadMode: 'remote'`：不启动静态资源服务，直接 `mainWindow.loadURL(remoteUrl)`。
 - `remoteUrl` 必须以 `http://` 或 `https://` 开头，否则会记录错误并回退加载本地页面。
 - `LocalHttpServer`、WebSocket、UDP 等外壳能力仍会按配置启动，页面来源不影响这些本地能力。
+- 如果线上页面加载失败，会自动显示本地兜底页 `appStatic/fallback/index.html`，避免白屏。
 
 注意事项：
 
@@ -345,6 +453,16 @@ window.AppFns.onWsMessage((message) => {
 ```
 
 根目录 `index.html` 提供了一个独立 WebSocket 调试示例，方便用普通浏览器验证本地 WS 服务。
+
+## HTTP 健康检查
+
+本地 API 服务提供 `/health`：
+
+```text
+http://127.0.0.1:50080/health
+```
+
+返回运行模式、时间戳等基础状态，便于外部程序确认桌面壳是否已经启动。
 
 ## 快捷键
 
@@ -382,6 +500,16 @@ checkForUpdates(feedUrl)
 updater.enabled = false
 ```
 
+页面可以手动检查更新并监听更新事件：
+
+```js
+window.AppFns.onUpdaterEvent((event) => {
+    console.log(event.type, event)
+})
+
+await window.AppFns.checkForUpdates()
+```
+
 ## 打包注意事项
 
 开发环境下 Electron 和 electron-builder 下载可能较慢，可以切换镜像源。
@@ -395,9 +523,10 @@ electron-builder 缓存目录 -> C:\Users\Administrator\AppData\Local\electron-b
 electron 缓存目录         -> C:\Users\Administrator\AppData\Local\electron
 ```
 
-当前 `package.json` 已提供 Windows / macOS / Linux 参考打包目标：
+当前 `package.json` 已提供 Windows / macOS / Linux 参考打包配置。Windows 打包目标通过命令二选一产出：
 
-- Windows：`nsis`
+- `npm run build-e:nsis`：只生成 NSIS 安装包。
+- `npm run build-e:portable`：只生成 portable 可执行文件。
 - macOS：`dmg`、`zip`
 - Linux：`AppImage`、`deb`
 
@@ -429,7 +558,36 @@ export APPLE_APP_SPECIFIC_PASSWORD=your_app_specific_password
 npm run build-e
 ```
 
-`package.json` 中已经开启 Windows 可执行文件签名编辑和更新包签名校验相关配置。真实证书仍需要通过本机证书仓库或环境变量提供。
+当前模板默认关闭 Windows 可执行文件签名编辑和更新包签名校验，方便本地无证书环境直接打包。
+
+如果你已经配置了真实代码签名证书，可以在 `package.json` 中恢复：
+
+```json
+"win": {
+    "signAndEditExecutable": true,
+    "verifyUpdateCodeSignature": true
+}
+```
+
+真实证书仍需要通过本机证书仓库或环境变量提供。
+
+### Windows winCodeSign 解压失败
+
+如果构建时报错：
+
+```text
+Cannot create symbolic link
+Cache\winCodeSign\...\darwin\10.12\lib\libcrypto.dylib
+```
+
+说明当前 Windows 用户没有创建符号链接权限，`electron-builder` 解压 `winCodeSign` 缓存包失败。
+
+推荐处理方式：
+
+1. 开启 Windows 开发者模式：`设置 -> 隐私和安全性 -> 开发者选项 -> 开发人员模式`。
+2. 或使用“以管理员身份运行”的终端执行构建。
+3. 删除失败缓存目录后重试：`C:\Users\Admin\AppData\Local\electron-builder\Cache\winCodeSign`。
+4. 如果只是本地调试安装包，可以临时执行 `npm run build-e:unsigned`。
 
 `electron-builder` 资源复制与排除示例：
 

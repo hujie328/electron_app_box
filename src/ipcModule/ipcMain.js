@@ -13,7 +13,7 @@ const registeredChannels = []
  *   2. 包装函数自动记录通道类型，unregisterIpcMainHandle 负责统一卸载；
  *   3. register 前先 unregister，保证开发热重载或窗口重建时不会堆积监听器。
  */
-function registerIpcMainHandle(mainWindow) {
+function registerIpcMainHandle(mainWindow, context = {}) {
     unregisterIpcMainHandle()
 
     const on = (channel, handler) => {
@@ -28,7 +28,7 @@ function registerIpcMainHandle(mainWindow) {
 
     // 路由模块只关心自己的业务通道；注册、记录、卸载规则统一由这里提供。
     ipcRoutes.forEach((registerRoute) => {
-        registerRoute({ on, handle, mainWindow })
+        registerRoute({ on, handle, mainWindow, ...context })
     })
 
     // 页面加载完成后向渲染进程推送就绪事件。

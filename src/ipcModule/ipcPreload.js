@@ -33,6 +33,15 @@ contextBridge.exposeInMainWorld('AppFns', {
     onCloseReply: createIpcSubscription('app:close:reply'),
     onReady: createIpcSubscription('app:ready'),
     onWsMessage: createIpcSubscription('app:ws:message'),
+    // 浏览器通过自定义协议唤起客户端时，主进程会把原始 URL 推送给页面处理。
+    onProtocolOpen: createIpcSubscription('protocol:open'),
+    // 下载事件由 DownloadManager 推送，页面要在组件卸载时取消订阅。
+    onDownloadStarted: createIpcSubscription('download:started'),
+    onDownloadProgress: createIpcSubscription('download:progress'),
+    onDownloadDone: createIpcSubscription('download:done'),
+    onDownloadFailed: createIpcSubscription('download:failed'),
+    // 自动更新状态统一走一个事件通道，payload.type 区分 checking/progress/downloaded/error。
+    onUpdaterEvent: createIpcSubscription('updater:event'),
 
     // ── 请求 / 响应 ───────────────────────────────────────────────
     invoke: (params) => ipcRenderer.invoke('app:demo:invoke', params),
@@ -42,4 +51,20 @@ contextBridge.exposeInMainWorld('AppFns', {
     selectDirectory: (options) => ipcRenderer.invoke('file:select-directory', options),
     saveTextFile: (options) => ipcRenderer.invoke('file:save-text', options),
     showItemInFolder: (targetPath) => ipcRenderer.invoke('file:show-in-folder', targetPath),
+
+    // ── 诊断信息 / 日志 ─────────────────────────────────────────
+    getAppInfo: () => ipcRenderer.invoke('diagnostics:app-info'),
+    // 打开目录类能力返回 shell.openPath 的结果；空字符串表示成功。
+    openLogDir: () => ipcRenderer.invoke('diagnostics:open-log-dir'),
+    openUserDataDir: () => ipcRenderer.invoke('diagnostics:open-user-data-dir'),
+    exportLog: (options) => ipcRenderer.invoke('diagnostics:export-log', options),
+
+    // ── 会话 / 缓存 ─────────────────────────────────────────────
+    clearCache: () => ipcRenderer.invoke('session:clear-cache'),
+    clearStorageData: (options) => ipcRenderer.invoke('session:clear-storage-data', options),
+    reloadApp: () => ipcRenderer.invoke('session:reload'),
+
+    // ── 下载 / 更新 ─────────────────────────────────────────────
+    startDownload: (url, options) => ipcRenderer.invoke('download:start', url, options),
+    checkForUpdates: () => ipcRenderer.invoke('updater:check'),
 })

@@ -51,6 +51,12 @@ async function getStoreValue(key, defaultValue) {
     return store.get(key, defaultValue)
 }
 
+/**
+ * 校验并标准化窗口 bounds。
+ *
+ * 用户可能手动修改配置文件，或者多显示器环境变化导致旧坐标不再合理；
+ * 这里先做最基础的数字和尺寸校验，无法使用时回退到默认窗口尺寸。
+ */
 function toValidBounds(bounds, defaultBounds) {
     if (!bounds || typeof bounds !== 'object') return defaultBounds
 

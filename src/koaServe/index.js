@@ -376,6 +376,25 @@ class LocalHttpServer {
         return this
     }
 
+    /** 挂载自定义 Koa 中间件。 */
+    use(middleware) {
+        if (typeof middleware !== 'function') throw new TypeError('middleware must be a function')
+        this.koaApp.use(middleware)
+        return this
+    }
+
+    /** 注册简单 GET 路由，适合健康检查等轻量 API。 */
+    get(routePath, handler) {
+        this.koaApp.use(async (ctx, next) => {
+            if (ctx.method === 'GET' && ctx.path === routePath) {
+                ctx.body = await handler(ctx)
+                return
+            }
+            await next()
+        })
+        return this
+    }
+
     /**
      * 在当前 HTTP 端口上开启 WebSocket 支持（noServer 模式，不额外占用端口）。
      *

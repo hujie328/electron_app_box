@@ -5,9 +5,12 @@
   "main": "src/index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "build-e": "electron-builder",
+    "build-e": "npm run build-e:nsis",
+    "build-e:unsigned": "set CSC_IDENTITY_AUTO_DISCOVERY=false&& electron-builder --win nsis --config.win.signAndEditExecutable=false --config.win.verifyUpdateCodeSignature=false",
     "dev-e": "chcp 65001 >nul && nodemon --watch src --watch appStatic --ext js,json,html --exec electron .",
-    "dev-e:once": "chcp 65001 >nul && electron ."
+    "dev-e:once": "chcp 65001 >nul && electron .",
+    "build-e:nsis": "electron-builder --win nsis",
+    "build-e:portable": "electron-builder --win portable"
   },
   "engines": {
     "node": ">=20"
@@ -29,7 +32,7 @@
   },
   "devDependencies": {
     "electron": "41.7.1",
-    "electron-builder": "^26.0.12",
+    "electron-builder": "^24.13.3",
     "nodemon": "^3.1.10"
   },
   "build": {
@@ -46,8 +49,8 @@
         }
       ],
       "artifactName": "${productName}_Setup_${version}.${ext}",
-      "signAndEditExecutable": true,
-      "verifyUpdateCodeSignature": true
+      "signAndEditExecutable": false,
+      "verifyUpdateCodeSignature": false
     },
     "nsis": {
       "oneClick": false,
@@ -71,7 +74,9 @@
         "deb"
       ],
       "category": "Utility"
+    },
+    "portable": {
+      "artifactName": "${productName}_Portable_${version}.${ext}"
     }
   }
 }
-

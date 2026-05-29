@@ -4,6 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- 默认 CSP 只允许加载同源资源；如果业务需要访问线上接口或图片，需要按需补充白名单。 -->
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:;">
     <title>Electron App Box</title>
 </head>
@@ -11,6 +12,7 @@
 <body>
     <h1>Electron_App_Box 使用示例</h1>
 
+    <!-- 示例脚本放在外部文件中，避免为了内联脚本放开 unsafe-inline。 -->
     <script src="./app.js"></script>
 </body>
 
